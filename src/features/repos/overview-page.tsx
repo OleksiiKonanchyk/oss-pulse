@@ -1,10 +1,26 @@
+import { sharedApiError } from '../../api/errors'
 import { EmptyState } from '../../components/empty-state'
+import { ErrorState } from '../../components/error-state'
+import { useRepos } from '../../queries/use-github-queries'
 import { AddRepoForm } from './add-repo-form'
 import { RepoRow } from './repo-row'
 import { useTrackedRepos } from './use-tracked-repos'
 
 export function OverviewPage() {
   const { repos, untrack } = useTrackedRepos()
+  const results = useRepos(repos)
+
+  /**
+   * Per-row degradation is right for a repository that was renamed or deleted: the rest
+   * of the table is still true. It is wrong for an exhausted quota, which takes out every
+   * row at once — rendering that as a column of em-dashes throws away the one screen this
+   * app was built to show. When the whole table failed the same way, the condition is
+   * global and gets named above the table; anything mixed stays per-row.
+   */
+  const everyRowFailed = results.length > 0 && results.every((result) => result.isError)
+  const wholeTableError = everyRowFailed
+    ? sharedApiError(results.map((result) => result.error))
+    : null
 
   return (
     <div className="space-y-6">
@@ -17,6 +33,15 @@ export function OverviewPage() {
         </div>
         <AddRepoForm />
       </div>
+
+      {wholeTableError && (
+        <ErrorState
+          error={wholeTableError}
+          onRetry={() => {
+            for (const result of results) void result.refetch()
+          }}
+        />
+      )}
 
       {repos.length === 0 ? (
         <EmptyState

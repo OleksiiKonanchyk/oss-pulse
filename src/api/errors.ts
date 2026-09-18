@@ -19,6 +19,25 @@ export function isApiError(value: unknown): value is GitHubError {
   return value instanceof GitHubError
 }
 
+/**
+ * Given the errors from a set of sibling requests, returns the one error they all share —
+ * or `null` if they failed differently, or if any of them succeeded.
+ *
+ * The distinction matters on the overview: three rows each failing with a quota error is
+ * one condition (the budget is gone) and deserves the designed screen once, while one row
+ * 404ing among two healthy ones is genuinely per-row and must not blank the table.
+ */
+export function sharedApiError(errors: readonly unknown[]): GitHubError | null {
+  const [first, ...rest] = errors
+  if (!isApiError(first)) return null
+
+  const sameKind = rest.every(
+    (error) => isApiError(error) && error.error.kind === first.error.kind,
+  )
+
+  return sameKind ? first : null
+}
+
 const ONE_HOUR_MS = 3_600_000
 
 function messageFrom(body: unknown, fallback: string): string {

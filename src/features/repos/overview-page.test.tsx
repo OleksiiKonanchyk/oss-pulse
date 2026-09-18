@@ -78,6 +78,67 @@ test('a failing repository row does not blank the page', async () => {
   ).toBeInTheDocument()
 })
 
+/**
+ * The rate-limit screen is this project's signature state, and on a public demo sharing a
+ * 60-requests-per-hour IP budget it is a likely first impression — so it has to be
+ * reachable from the landing page, not only from a detail route.
+ */
+test('an exhausted quota renders the designed rate-limit screen above the table', async () => {
+  server.use(
+    http.get('https://api.github.com/repos/:owner/:name', () =>
+      HttpResponse.json(
+        { message: 'API rate limit exceeded' },
+        {
+          status: 403,
+          headers: { 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': '1800000000' },
+        },
+      ),
+    ),
+  )
+
+  renderPage()
+
+  expect(await screen.findByRole('heading', { name: /rate limit/i })).toBeInTheDocument()
+  // Named once for the whole table, not once per row.
+  expect(screen.getAllByRole('alert')).toHaveLength(1)
+  // And the table itself is still there underneath.
+  expect(screen.getByRole('columnheader', { name: /repository/i })).toBeInTheDocument()
+})
+
+test('a whole table failing the same non-quota way is also named once', async () => {
+  server.use(
+    http.get('https://api.github.com/repos/:owner/:name', () =>
+      HttpResponse.json({ message: 'Not Found' }, { status: 404 }),
+    ),
+  )
+
+  renderPage()
+
+  expect(await screen.findByRole('heading', { name: /not found/i })).toBeInTheDocument()
+  expect(screen.getAllByRole('alert')).toHaveLength(1)
+})
+
+test('a mixed set of failures stays per-row and shows no whole-table error', async () => {
+  server.use(
+    http.get('https://api.github.com/repos/facebook/react', () =>
+      HttpResponse.json({ message: 'Not Found' }, { status: 404 }),
+    ),
+    http.get('https://api.github.com/repos/:owner/:name', ({ params }) =>
+      HttpResponse.json(repoPayload(`${params.owner}/${params.name}`, 5)),
+    ),
+  )
+
+  renderPage()
+
+  await screen.findByText('vercel/next.js')
+  await waitFor(() =>
+    expect(
+      screen.getByText(/unavailable/i, { ignore: 'script, style, .sr-only' }),
+    ).toBeInTheDocument(),
+  )
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+})
+
 test('a pending row exposes a busy state to assistive technology', () => {
   server.use(
     http.get('https://api.github.com/repos/:owner/:name', async ({ params }) => {

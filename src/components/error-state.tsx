@@ -1,9 +1,76 @@
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { isApiError, type ApiError } from '../api/errors'
 
-function minutesUntil(date: Date): number {
-  return Math.max(1, Math.ceil((date.getTime() - Date.now()) / 60_000))
+const SECOND_MS = 1000
+
+function formatCountdown(remainingMs: number): string {
+  const totalSeconds = Math.ceil(remainingMs / SECOND_MS)
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+
+  return `${minutes}:${String(seconds).padStart(2, '0')}`
+}
+
+/**
+ * Milliseconds left until `target`, recomputed every second. Computing it once at render
+ * — which is what this screen used to do — produces a number that is wrong the moment it
+ * is painted and stays on screen going staler, which is worse than showing nothing.
+ *
+ * The interval is cleared on unmount and again the moment the deadline passes, so an
+ * error screen left open in a background tab is not a timer running forever.
+ */
+function useCountdown(target: Date): number {
+  const targetTime = target.getTime()
+  const [remaining, setRemaining] = useState(() => Math.max(0, targetTime - Date.now()))
+
+  useEffect(() => {
+    setRemaining(Math.max(0, targetTime - Date.now()))
+
+    const id = setInterval(() => {
+      const next = Math.max(0, targetTime - Date.now())
+      setRemaining(next)
+      if (next === 0) clearInterval(id)
+    }, SECOND_MS)
+
+    return () => clearInterval(id)
+  }, [targetTime])
+
+  return remaining
+}
+
+function RateLimitBody({ resetAt }: { resetAt: Date }) {
+  const remaining = useCountdown(resetAt)
+  const resetTime = resetAt.toLocaleTimeString()
+
+  return (
+    <>
+      {/*
+        The wrapper below carries role="alert" — an assertive, atomic live region, so any
+        text change inside it is re-announced in full. A clock ticking once a second would
+        therefore interrupt a screen-reader user once a second. The ticking value is hidden
+        from assistive technology and the absolute reset time, which never changes, carries
+        the same information in the sentence itself.
+      */}
+      <p>
+        Anonymous requests are capped at 60 per hour. This one resets at {resetTime}
+        <span aria-hidden="true">
+          {' — '}
+          {remaining > 0 ? 'in ' : ''}
+          <span data-testid="rate-limit-countdown" className="font-medium tabular-nums">
+            {remaining > 0 ? formatCountdown(remaining) : 'any moment now'}
+          </span>
+        </span>
+        .
+      </p>
+      <p className="mt-2">
+        <Link to="/settings" className="underline underline-offset-4">
+          Add a token
+        </Link>{' '}
+        to raise the limit to 5,000 per hour. It stays in your browser.
+      </p>
+    </>
+  )
 }
 
 function describe(error: ApiError): { title: string; body: ReactNode } {
@@ -11,21 +78,7 @@ function describe(error: ApiError): { title: string; body: ReactNode } {
     case 'rate-limited':
       return {
         title: 'GitHub rate limit reached',
-        body: (
-          <>
-            <p>
-              Anonymous requests are capped at 60 per hour. This one resets in about{' '}
-              {minutesUntil(error.resetAt)} minutes, at{' '}
-              {error.resetAt.toLocaleTimeString()}.
-            </p>
-            <p className="mt-2">
-              <Link to="/settings" className="underline underline-offset-4">
-                Add a token
-              </Link>{' '}
-              to raise the limit to 5,000 per hour. It stays in your browser.
-            </p>
-          </>
-        ),
+        body: <RateLimitBody resetAt={error.resetAt} />,
       }
     case 'not-found':
       return {
