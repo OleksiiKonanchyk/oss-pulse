@@ -1,5 +1,6 @@
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { Issue } from '../../api/types'
+import { pluralize } from '../../lib/format'
 
 function weekKey(date: Date): string {
   const monday = new Date(date)
@@ -26,7 +27,7 @@ export function IssueThroughputChart({ issues }: { issues: Issue[] }) {
   return (
     <figure
       role="img"
-      aria-label={`Issues opened per week: ${issues.length} issues across ${data.length} weeks.`}
+      aria-label={`Issues on this page by week opened: ${pluralize(issues.length, 'issue')} across ${pluralize(data.length, 'week')}.`}
     >
       <ResponsiveContainer width="100%" height={220}>
         <LineChart data={data}>

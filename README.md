@@ -32,6 +32,9 @@ is built around it rather than around the happy path:
   (`src/api/errors.ts`) and rendered as an explanation with a countdown to reset and
   a link to add a token — not a generic error or an empty panel
   (`src/components/error-state.tsx`).
+- **Each overview row costs one sparkline request**, gated on that row's repository
+  request having succeeded — a row that 404'd or hit the limit spends nothing confirming
+  it, and the commit-activity cache entry is shared with the detail page.
 - **An optional personal access token** raises the ceiling to 5,000 requests/hour.
   It's entered on the Settings page, kept in `localStorage`, sent only to
   `api.github.com`, and needs no scopes for public data (`src/features/settings/settings-page.tsx`,
@@ -81,6 +84,15 @@ npm test        # run the test suite
 ```
 
 Other scripts: `npm run typecheck`, `npm run build`, `npm run lint`.
+
+## What the throughput chart is, and isn't
+
+The card headed "Issues on this page, by week opened" charts exactly that: the 25 rows
+currently on screen, under the filters currently applied, bucketed by the week each one
+was opened. It is not a repository-wide time series, and it is not opened-against-closed.
+Either would mean walking the issue history a page at a time — one request per page, which
+for a busy repository is the entire hourly budget — so the card is labelled with the scope
+it actually has rather than implying a total that would silently change as you page.
 
 ## Deliberate omissions
 

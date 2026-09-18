@@ -17,3 +17,8 @@ export function formatRelativeDate(date: Date): string {
 
   return `${Math.round(days / 365)} years ago`
 }
+
+/** Charts describe themselves in prose for screen readers; "across 1 weeks" undoes that. */
+export function pluralize(count: number, singular: string, plural = `${singular}s`): string {
+  return `${count} ${count === 1 ? singular : plural}`
+}

@@ -40,7 +40,18 @@ export function IssuesPanel({ fullName }: { fullName: string }) {
 
   return (
     <div className="space-y-6">
-      <Card title="Issues opened per week">
+      {/*
+        The chart is fed the rows already on screen — one page of 25, as filtered — because
+        a repository-wide series would cost one request per page of history, which this
+        app's request budget does not have. That is a defensible trade, but only if the
+        card says so: labelled "Issues opened per week" it silently rewrote its own meaning
+        every time the reader paged or changed the filter.
+
+        No status region here: the same query feeds the table below, whose region already
+        announces the load, and announcing it twice is the bug fixed elsewhere in this
+        file's neighbourhood.
+      */}
+      <Card title="Issues on this page, by week opened">
         {data ? <IssueThroughputChart issues={data.issues} /> : <Skeleton rows={3} />}
       </Card>
 

@@ -140,3 +140,23 @@ test('the live status region persists across a filter change and announces the n
   expect(afterStatus).toBe(beforeStatus)
   expect(afterStatus).toHaveTextContent(/2 closed issues,/i)
 })
+
+/**
+ * The card used to be headed "Issues opened per week", which reads as a property of the
+ * repository. It is fed `data.issues` — one page of 25 rows, under the current filters —
+ * so it rewrote its own meaning silently every time the reader paged or filtered.
+ */
+test('the throughput card names the scope it actually charts', async () => {
+  server.use(
+    http.get('https://api.github.com/repos/a/b/issues', () =>
+      HttpResponse.json([issue(1, 'First problem')]),
+    ),
+  )
+
+  renderPanel()
+
+  await screen.findByText('First problem')
+  expect(
+    screen.getByRole('heading', { name: /issues on this page, by week opened/i }),
+  ).toBeInTheDocument()
+})

@@ -106,7 +106,11 @@ Adding and removing update the list optimistically and roll back on failure.
 
 - **Header** — stars, forks, watchers, language, license, last push
 - **Commit activity** — 52 weeks, from `/stats/commit_activity`
-- **Issue throughput** — opened against closed, by week
+- **Issue throughput** — issues opened, by week. **Amended during build:** only the
+  opened series ships, and it charts the page of issues currently on screen (25 rows,
+  as filtered) rather than a repository-wide series. A repository-wide count would cost
+  a request per page of issue history, which the 60-per-hour budget cannot spend; the
+  card is labelled with that scope rather than implying a total.
 - **Contributors** — top ten by commits
 - **Issues** — paginated, filterable table (below)
 

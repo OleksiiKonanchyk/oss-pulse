@@ -1,6 +1,7 @@
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { CommitWeek } from '../../api/types'
 import { EmptyState } from '../../components/empty-state'
+import { pluralize } from '../../lib/format'
 
 type Props = { weeks: CommitWeek[] | 'computing' }
 
@@ -31,7 +32,7 @@ export function CommitActivityChart({ weeks }: Props) {
   return (
     <figure
       role="img"
-      aria-label={`Commit activity: ${total} commits across ${weeks.length} weeks.`}
+      aria-label={`Commit activity: ${pluralize(total, 'commit')} across ${pluralize(weeks.length, 'week')}.`}
     >
       <ResponsiveContainer width="100%" height={220}>
         <BarChart data={data}>

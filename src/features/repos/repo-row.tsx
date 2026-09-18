@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { Skeleton } from '../../components/skeleton'
 import { Sparkline } from '../../components/sparkline'
 import { useCommitActivity, useRepo } from '../../queries/use-github-queries'
-import { formatCompact, formatRelativeDate } from '../../lib/format'
+import { formatCompact, formatRelativeDate, pluralize } from '../../lib/format'
 
 /** "Recent" activity, not the detail page's full year: 52 bars in a table cell is mush. */
 const SPARKLINE_WEEKS = 12
@@ -74,7 +74,7 @@ export function RepoRow({ fullName, onUntrack }: { fullName: string; onUntrack: 
         ) : recentWeeks.length > 0 ? (
           <Sparkline
             weeks={recentWeeks}
-            label={`${commitTotal} commits in the last ${recentWeeks.length} weeks`}
+            label={`${pluralize(commitTotal, 'commit')} in the last ${pluralize(recentWeeks.length, 'week')}`}
           />
         ) : (
           <span className="text-slate-500">—</span>
