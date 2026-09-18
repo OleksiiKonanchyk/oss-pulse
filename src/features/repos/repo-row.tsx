@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { Skeleton } from '../../components/skeleton'
 import { Sparkline } from '../../components/sparkline'
 import { useCommitActivity, useRepo } from '../../queries/use-github-queries'
 import { formatCompact, formatRelativeDate } from '../../lib/format'
@@ -7,7 +8,7 @@ import { formatCompact, formatRelativeDate } from '../../lib/format'
 const SPARKLINE_WEEKS = 12
 
 function CellPlaceholder({ width = 'w-12' }: { width?: string }) {
-  return <div className={`h-4 ${width} animate-pulse rounded bg-slate-200 dark:bg-slate-800`} />
+  return <Skeleton rows={1} className={`h-4 ${width}`} />
 }
 
 /**

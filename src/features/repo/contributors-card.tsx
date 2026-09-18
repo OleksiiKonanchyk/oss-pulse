@@ -1,4 +1,5 @@
 import { Card } from '../../components/card'
+import { EmptyState } from '../../components/empty-state'
 import { ErrorState } from '../../components/error-state'
 import { Skeleton } from '../../components/skeleton'
 import { formatCompact } from '../../lib/format'
@@ -22,7 +23,7 @@ export function ContributorsCard({ fullName }: { fullName: string }) {
 
   return (
     <Card title="Top contributors">
-      <span role="status" aria-live="polite" className="sr-only">
+      <span role="status" aria-live="polite" aria-atomic="true" className="sr-only">
         {statusText}
       </span>
 
@@ -30,9 +31,14 @@ export function ContributorsCard({ fullName }: { fullName: string }) {
         <Skeleton rows={5} />
       ) : isError ? (
         <ErrorState error={error} onRetry={() => refetch()} />
+      ) : data.length === 0 ? (
+        <EmptyState
+          title="No contributors yet"
+          description="GitHub lists no contributors for this repository."
+        />
       ) : (
         <ul className="space-y-3">
-          {data.slice(0, 10).map((contributor) => (
+          {data.map((contributor) => (
             <li key={contributor.login} className="flex items-center gap-3">
               <img
                 src={contributor.avatarUrl}

@@ -1,5 +1,6 @@
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { CommitWeek } from '../../api/types'
+import { EmptyState } from '../../components/empty-state'
 
 type Props = { weeks: CommitWeek[] | 'computing' }
 
@@ -13,7 +14,12 @@ export function CommitActivityChart({ weeks }: Props) {
   }
 
   if (weeks.length === 0) {
-    return <p className="text-sm text-slate-500">No commit activity in the last year.</p>
+    return (
+      <EmptyState
+        title="No commit activity"
+        description="This repository has no commits in the last 52 weeks."
+      />
+    )
   }
 
   const total = weeks.reduce((sum, week) => sum + week.total, 0)
