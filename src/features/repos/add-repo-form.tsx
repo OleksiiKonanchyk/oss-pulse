@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -7,19 +7,29 @@ import { verifyRepoExists } from '../../queries/use-github-queries'
 import { useTrackedRepos } from './use-tracked-repos'
 
 const OWNER_NAME = /^([\w.-]+)\/([\w.-]+)$/
+const URL_LIKE = /^https?:\/\//i
+const GITHUB_HOSTNAMES = new Set(['github.com', 'www.github.com'])
+
+/** A pasted clone URL's final segment carries a `.git` suffix that isn't part of the repo name. */
+function stripGitSuffix(name: string): string {
+  return name.replace(/\.git$/i, '')
+}
 
 /** Accepts `owner/name` or any github.com URL pointing at a repository. */
 export function parseRepoInput(value: string): string | null {
   const trimmed = value.trim()
   if (trimmed.length === 0) return null
 
-  if (trimmed.startsWith('http')) {
+  if (URL_LIKE.test(trimmed)) {
     try {
       const url = new URL(trimmed)
-      if (url.hostname !== 'github.com') return null
+      if (!GITHUB_HOSTNAMES.has(url.hostname.toLowerCase())) return null
 
-      const [owner, name] = url.pathname.split('/').filter(Boolean)
-      if (!owner || !name) return null
+      const [owner, rawName] = url.pathname.split('/').filter(Boolean)
+      if (!owner || !rawName) return null
+
+      const name = stripGitSuffix(rawName)
+      if (!name) return null
 
       return `${owner}/${name}`
     } catch {
@@ -27,7 +37,14 @@ export function parseRepoInput(value: string): string | null {
     }
   }
 
-  return OWNER_NAME.test(trimmed) ? trimmed : null
+  const match = OWNER_NAME.exec(trimmed)
+  if (!match) return null
+
+  const [, owner, rawName] = match
+  const name = stripGitSuffix(rawName)
+  if (!name) return null
+
+  return `${owner}/${name}`
 }
 
 const schema = z.object({
@@ -39,8 +56,11 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>
 
 export function AddRepoForm() {
-  const { track, untrack } = useTrackedRepos()
+  const { repos, track, untrack } = useTrackedRepos()
   const [serverError, setServerError] = useState<string | null>(null)
+  // Guards against a second submission (e.g. Enter fired while a click-triggered
+  // submit is still pending) racing the first and clobbering its error message.
+  const submittingRef = useRef(false)
 
   const { register, handleSubmit, reset, formState } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -48,24 +68,37 @@ export function AddRepoForm() {
   })
 
   async function onSubmit({ input }: FormValues) {
-    const fullName = parseRepoInput(input)
-    if (!fullName) return
-
-    setServerError(null)
-
-    // Optimistic: the row appears immediately and rolls back if GitHub disagrees.
-    track(fullName)
-    reset()
+    if (submittingRef.current) return
+    submittingRef.current = true
 
     try {
-      await verifyRepoExists(fullName)
-    } catch (error) {
-      untrack(fullName)
-      setServerError(
-        isApiError(error) && error.error.kind === 'not-found'
-          ? `${fullName} could not be found on GitHub.`
-          : `${fullName} could not be verified. Try again.`,
+      const fullName = parseRepoInput(input)
+      if (!fullName) return
+
+      setServerError(null)
+
+      // A repo already on the list must not be removed just because this
+      // redundant verification attempt fails; only roll back what we added.
+      const wasAlreadyTracked = repos.some(
+        (name) => name.toLowerCase() === fullName.toLowerCase(),
       )
+
+      // Optimistic: the row appears immediately and rolls back if GitHub disagrees.
+      track(fullName)
+      reset()
+
+      try {
+        await verifyRepoExists(fullName)
+      } catch (error) {
+        if (!wasAlreadyTracked) untrack(fullName)
+        setServerError(
+          isApiError(error) && error.error.kind === 'not-found'
+            ? `${fullName} could not be found on GitHub.`
+            : `${fullName} could not be verified. Try again.`,
+        )
+      }
+    } finally {
+      submittingRef.current = false
     }
   }
 

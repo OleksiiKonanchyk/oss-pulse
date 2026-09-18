@@ -28,6 +28,16 @@ test('rejects input that is not a repository reference', () => {
   expect(parseRepoInput('https://example.com/a/b')).toBeNull()
 })
 
+test('strips a .git suffix from clone URLs and plain owner/name references', () => {
+  expect(parseRepoInput('https://github.com/tanstack/query.git')).toBe('tanstack/query')
+  expect(parseRepoInput('tanstack/query.git')).toBe('tanstack/query')
+})
+
+test('accepts www.github.com and uppercase schemes', () => {
+  expect(parseRepoInput('https://www.github.com/tanstack/query')).toBe('tanstack/query')
+  expect(parseRepoInput('HTTPS://github.com/tanstack/query')).toBe('tanstack/query')
+})
+
 test('shows a validation message without calling the API', async () => {
   const user = userEvent.setup()
   renderForm()
@@ -73,4 +83,43 @@ test('does not track a repository that does not exist, and says so', async () =>
 
   expect(await screen.findByText(/could not be found/i)).toBeInTheDocument()
   expect(getTrackedRepos()).not.toContain('ghost/missing')
+})
+
+test('rolls back a newly added repository when verification fails', async () => {
+  server.use(
+    http.get('https://api.github.com/repos/new/repo', () =>
+      HttpResponse.json({ message: 'Server Error' }, { status: 500 }),
+    ),
+  )
+
+  expect(getTrackedRepos()).not.toContain('new/repo')
+
+  const user = userEvent.setup()
+  renderForm()
+
+  await user.type(screen.getByLabelText(/add a repository/i), 'new/repo')
+  await user.click(screen.getByRole('button', { name: /add/i }))
+
+  expect(await screen.findByText(/could not be verified/i)).toBeInTheDocument()
+  expect(getTrackedRepos()).not.toContain('new/repo')
+})
+
+test('does not remove an already-tracked repository when re-adding it fails verification', async () => {
+  server.use(
+    http.get('https://api.github.com/repos/facebook/react', () =>
+      HttpResponse.json({ message: 'Server Error' }, { status: 500 }),
+    ),
+  )
+
+  // Seeded by the default tracked list — already present before this submission.
+  expect(getTrackedRepos()).toContain('facebook/react')
+
+  const user = userEvent.setup()
+  renderForm()
+
+  await user.type(screen.getByLabelText(/add a repository/i), 'facebook/react')
+  await user.click(screen.getByRole('button', { name: /add/i }))
+
+  expect(await screen.findByText(/could not be verified/i)).toBeInTheDocument()
+  expect(getTrackedRepos()).toContain('facebook/react')
 })
