@@ -32,9 +32,11 @@ is built around it rather than around the happy path:
   (`src/api/errors.ts`) and rendered as an explanation with a countdown to reset and
   a link to add a token — not a generic error or an empty panel
   (`src/components/error-state.tsx`).
-- **Each overview row costs one sparkline request**, gated on that row's repository
-  request having succeeded — a row that 404'd or hit the limit spends nothing confirming
-  it, and the commit-activity cache entry is shared with the detail page.
+- **Each overview row costs one sparkline request — up to five while GitHub is still
+  computing statistics for that repository** (`getCommitActivity` polls the `202`
+  response), gated on that row's repository request having succeeded — a row that
+  404'd or hit the limit spends nothing confirming it, and the commit-activity cache
+  entry is shared with the detail page.
 - **An optional personal access token** raises the ceiling to 5,000 requests/hour.
   It's entered on the Settings page, kept in `localStorage`, sent only to
   `api.github.com`, and needs no scopes for public data (`src/features/settings/settings-page.tsx`,
