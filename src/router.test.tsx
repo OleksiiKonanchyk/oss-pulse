@@ -1,6 +1,9 @@
 import { render, screen } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { RouterProvider, createMemoryRouter } from 'react-router-dom'
+import { http, HttpResponse } from 'msw'
 import { afterEach, beforeEach, vi } from 'vitest'
+import { server } from '../test/msw/server'
 import { GitHubError } from './api/errors'
 import { routes } from './router'
 
@@ -27,8 +30,14 @@ afterEach(() => {
 })
 
 function renderAt(path: string) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const router = createMemoryRouter(routes, { initialEntries: [path] })
-  return render(<RouterProvider router={router} />)
+
+  return render(
+    <QueryClientProvider client={client}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  )
 }
 
 test('a route that throws renders the app error state, not React Router default screen', () => {
@@ -57,4 +66,35 @@ test('a classified API error thrown during render keeps its designed screen', ()
   renderAt('/')
 
   expect(screen.getByRole('heading', { name: /rate limit/i })).toBeInTheDocument()
+})
+
+/**
+ * The repository route is lazily imported so that Recharts stays out of the entry chunk.
+ * A `React.lazy` element that is not wrapped in `Suspense` throws at render, so this both
+ * proves the split route still resolves and guards the boundary that makes it legal.
+ */
+test('the lazily-loaded repository route resolves and renders', async () => {
+  const repo = 'https://api.github.com/repos/a/b'
+  server.use(
+    http.get(repo, () =>
+      HttpResponse.json({
+        full_name: 'a/b',
+        description: null,
+        stargazers_count: 1,
+        forks_count: 1,
+        open_issues_count: 0,
+        language: null,
+        pushed_at: '2026-09-01T00:00:00Z',
+        html_url: 'https://github.com/a/b',
+        license: null,
+      }),
+    ),
+    http.get(`${repo}/stats/commit_activity`, () => HttpResponse.json([])),
+    http.get(`${repo}/contributors`, () => HttpResponse.json([])),
+    http.get(`${repo}/issues`, () => HttpResponse.json([])),
+  )
+
+  renderAt('/repo/a/b')
+
+  expect(await screen.findByRole('heading', { name: 'a/b' })).toBeInTheDocument()
 })
