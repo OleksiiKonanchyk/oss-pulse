@@ -52,3 +52,22 @@ test('corrupt stored data falls back to the defaults', () => {
   localStorage.setItem('oss-pulse:tracked-repos', 'not json')
   expect(getTrackedRepos()).toEqual(DEFAULT_TRACKED_REPOS)
 })
+
+test('snapshot is stable when storage key is absent', () => {
+  const result1 = getTrackedRepos()
+  const result2 = getTrackedRepos()
+  expect(result1).toBe(result2)
+})
+
+test('snapshot is stable when storage key is populated', () => {
+  trackRepo('tanstack/query')
+  const result1 = getTrackedRepos()
+  const result2 = getTrackedRepos()
+  expect(result1).toBe(result2)
+})
+
+test('default repositories cannot be mutated', () => {
+  expect(() => {
+    getTrackedRepos().push('hacked/repo')
+  }).toThrow()
+})

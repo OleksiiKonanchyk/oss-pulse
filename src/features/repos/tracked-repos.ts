@@ -1,27 +1,62 @@
-import { readJson, writeJson } from '../../lib/storage'
+import { writeJson } from '../../lib/storage'
 
 const KEY = 'oss-pulse:tracked-repos'
 
 /** Recognisable, high-activity repositories so a first visit is never blank. */
-export const DEFAULT_TRACKED_REPOS = ['facebook/react', 'vercel/next.js', 'rails/rails']
+export const DEFAULT_TRACKED_REPOS = Object.freeze([
+  'facebook/react',
+  'vercel/next.js',
+  'rails/rails',
+])
 
 type Listener = () => void
 const listeners = new Set<Listener>()
+
+// Cache for snapshot stability: track raw string and parsed array to avoid reparsing
+let cachedRawString: string | null | undefined = undefined
+let cachedParsedRepos: string[] | null = null
 
 function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((entry) => typeof entry === 'string')
 }
 
 export function getTrackedRepos(): string[] {
-  const stored = readJson<unknown>(KEY, null)
-  if (stored === null) return DEFAULT_TRACKED_REPOS
-  if (!isStringArray(stored)) return DEFAULT_TRACKED_REPOS
+  const raw = localStorage.getItem(KEY)
 
-  return stored
+  // Return cached snapshot if raw string hasn't changed
+  if (raw === cachedRawString && cachedParsedRepos !== null) {
+    return cachedParsedRepos
+  }
+
+  // Parse fresh or return defaults
+  let parsed: string[]
+  if (raw === null) {
+    parsed = DEFAULT_TRACKED_REPOS as string[]
+  } else {
+    try {
+      const value = JSON.parse(raw)
+      if (isStringArray(value)) {
+        parsed = value
+      } else {
+        parsed = DEFAULT_TRACKED_REPOS as string[]
+      }
+    } catch {
+      parsed = DEFAULT_TRACKED_REPOS as string[]
+    }
+  }
+
+  // Update cache
+  cachedRawString = raw
+  cachedParsedRepos = parsed
+
+  return parsed
 }
 
 function save(repos: string[]): void {
   writeJson(KEY, repos)
+  // Invalidate cache on mutation
+  cachedRawString = undefined
+  cachedParsedRepos = null
   for (const listener of listeners) listener()
 }
 
