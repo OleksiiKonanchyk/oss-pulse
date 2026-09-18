@@ -1,6 +1,10 @@
 import { Link } from 'react-router-dom'
-import { useRepo } from '../../queries/use-github-queries'
+import { Sparkline } from '../../components/sparkline'
+import { useCommitActivity, useRepo } from '../../queries/use-github-queries'
 import { formatCompact, formatRelativeDate } from '../../lib/format'
+
+/** "Recent" activity, not the detail page's full year: 52 bars in a table cell is mush. */
+const SPARKLINE_WEEKS = 12
 
 function CellPlaceholder({ width = 'w-12' }: { width?: string }) {
   return <div className={`h-4 ${width} animate-pulse rounded bg-slate-200 dark:bg-slate-800`} />
@@ -19,6 +23,13 @@ export function RepoRow({ fullName, onUntrack }: { fullName: string; onUntrack: 
   const repo = !isPending && !isError && data ? data : undefined
 
   const statusText = isPending ? `Loading ${fullName}` : failed ? `${fullName} is unavailable` : ''
+
+  const activity = useCommitActivity(fullName, { enabled: repo !== undefined })
+  // `'computing'` (GitHub's 202) and a failed request both mean "nothing to draw here",
+  // which in one table cell is the same outcome: no sparkline, no explanation demanded of
+  // a reader skimming five rows. The detail page is where that state gets explained.
+  const recentWeeks = Array.isArray(activity.data) ? activity.data.slice(-SPARKLINE_WEEKS) : []
+  const commitTotal = recentWeeks.reduce((sum, week) => sum + week.total, 0)
 
   return (
     <tr className="border-t border-slate-200 dark:border-slate-800" aria-busy={isPending}>
@@ -55,6 +66,18 @@ export function RepoRow({ fullName, onUntrack }: { fullName: string; onUntrack: 
       </td>
       <td className="px-4 py-3 text-sm text-slate-500">
         {isPending ? <CellPlaceholder width="w-20" /> : repo ? formatRelativeDate(repo.pushedAt) : 'unavailable'}
+      </td>
+      <td className="px-4 py-3">
+        {isPending || (repo && activity.isPending) ? (
+          <CellPlaceholder width="w-24" />
+        ) : recentWeeks.length > 0 ? (
+          <Sparkline
+            weeks={recentWeeks}
+            label={`${commitTotal} commits in the last ${recentWeeks.length} weeks`}
+          />
+        ) : (
+          <span className="text-slate-500">—</span>
+        )}
       </td>
       <td className="px-4 py-3 text-right">
         {repo && (

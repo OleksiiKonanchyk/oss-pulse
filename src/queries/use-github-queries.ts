@@ -41,12 +41,18 @@ export function useContributors(fullName: string) {
   })
 }
 
-export function useCommitActivity(fullName: string) {
+/**
+ * `enabled` exists for the overview sparklines: a row whose repository request already
+ * failed has nothing to draw, and spending another request from a 60-per-hour budget to
+ * confirm that would be the wrong trade.
+ */
+export function useCommitActivity(fullName: string, { enabled = true } = {}) {
   const token = useToken()
 
   return useQuery({
     queryKey: queryKeys.commitActivity(fullName),
     queryFn: ({ signal }) => getCommitActivity(fullName, { token, signal }),
+    enabled,
   })
 }
 

@@ -1,14 +1,23 @@
+import { useState } from 'react'
 import { sharedApiError } from '../../api/errors'
 import { EmptyState } from '../../components/empty-state'
 import { ErrorState } from '../../components/error-state'
 import { useRepos } from '../../queries/use-github-queries'
 import { AddRepoForm } from './add-repo-form'
 import { RepoRow } from './repo-row'
+import { SORT_COLUMNS, nextSort, sortRepoRows, type Sort, type SortKey } from './sort-repos'
 import { useTrackedRepos } from './use-tracked-repos'
+
+function ariaSort(sort: Sort, key: SortKey): 'ascending' | 'descending' | 'none' {
+  if (sort.key !== key) return 'none'
+
+  return sort.direction === 'asc' ? 'ascending' : 'descending'
+}
 
 export function OverviewPage() {
   const { repos, untrack } = useTrackedRepos()
   const results = useRepos(repos)
+  const [sort, setSort] = useState<Sort>({ key: 'name', direction: 'asc' })
 
   /**
    * Per-row degradation is right for a repository that was renamed or deleted: the rest
@@ -21,6 +30,11 @@ export function OverviewPage() {
   const wholeTableError = everyRowFailed
     ? sharedApiError(results.map((result) => result.error))
     : null
+
+  const rows = sortRepoRows(
+    repos.map((fullName, index) => ({ fullName, repo: results[index]?.data })),
+    sort,
+  )
 
   return (
     <div className="space-y-6">
@@ -54,16 +68,42 @@ export function OverviewPage() {
             <caption className="sr-only">Tracked repositories and their current activity</caption>
             <thead className="text-xs uppercase tracking-wide text-slate-500">
               <tr>
-                <th scope="col" className="px-4 py-3">Repository</th>
-                <th scope="col" className="px-4 py-3">Stars</th>
-                <th scope="col" className="px-4 py-3">Open issues</th>
-                <th scope="col" className="px-4 py-3">Last push</th>
-                <th scope="col" className="px-4 py-3 text-right">Actions</th>
+                {SORT_COLUMNS.map((column) => (
+                  <th
+                    key={column.key}
+                    scope="col"
+                    aria-sort={ariaSort(sort, column.key)}
+                    className="px-4 py-3"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setSort((current) => nextSort(current, column.key))}
+                      className="flex items-center gap-1 uppercase tracking-wide focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
+                    >
+                      {column.label}
+                      {/* The arrow is decoration; aria-sort on the header carries the
+                          state, and the column's accessible name stays its label. */}
+                      <span aria-hidden="true" className="text-[0.6rem]">
+                        {sort.key === column.key ? (sort.direction === 'asc' ? '▲' : '▼') : '↕'}
+                      </span>
+                    </button>
+                  </th>
+                ))}
+                <th scope="col" className="px-4 py-3">
+                  Activity
+                </th>
+                <th scope="col" className="px-4 py-3 text-right">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody>
-              {repos.map((fullName) => (
-                <RepoRow key={fullName} fullName={fullName} onUntrack={() => untrack(fullName)} />
+              {rows.map((row) => (
+                <RepoRow
+                  key={row.fullName}
+                  fullName={row.fullName}
+                  onUntrack={() => untrack(row.fullName)}
+                />
               ))}
             </tbody>
           </table>

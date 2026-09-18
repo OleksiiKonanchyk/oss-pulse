@@ -205,7 +205,7 @@ exists visually is a gap a reviewing developer will notice.
 | Rate limits make the live demo look broken | Persisted cache plus seeded default repos; the demo works with zero requests on a warm cache |
 | Scope creep into a real product | Non-goals above are binding. No auth, no backend, no writes. |
 | Reads as generic | The rate-limit handling, URL-as-state, and `202` retry are the differentiators; they get built, not cut |
-| Charts eat the schedule | Two chart types only — a bar chart (commit activity, reused at small size as the overview sparkline) and a line chart (issue throughput) |
+| Charts eat the schedule | Two Recharts chart types only — a bar chart (commit activity) and a line chart (issue throughput). **Amended during build:** the overview sparkline is a hand-written inline SVG rather than the bar chart reused at small size, so that Recharts stays out of the landing page's bundle and behind the lazily-loaded repository route |
 
 ## Out of scope for v1
 

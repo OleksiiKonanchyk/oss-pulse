@@ -25,8 +25,6 @@ function useCountdown(target: Date): number {
   const [remaining, setRemaining] = useState(() => Math.max(0, targetTime - Date.now()))
 
   useEffect(() => {
-    setRemaining(Math.max(0, targetTime - Date.now()))
-
     const id = setInterval(() => {
       const next = Math.max(0, targetTime - Date.now())
       setRemaining(next)

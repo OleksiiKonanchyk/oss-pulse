@@ -1,9 +1,37 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { http, HttpResponse, delay } from 'msw'
+import { beforeEach } from 'vitest'
 import { server } from '../../../test/msw/server'
 import { OverviewPage } from './overview-page'
+
+const COMMIT_ACTIVITY_URL = 'https://api.github.com/repos/:owner/:name/stats/commit_activity'
+
+// Every row draws a sparkline, so every row asks for commit activity. Tests that are not
+// about the sparkline stub it empty; a `server.use` inside a test still takes precedence.
+beforeEach(() => {
+  server.use(http.get(COMMIT_ACTIVITY_URL, () => HttpResponse.json([])))
+})
+
+function commitWeeks(totals: number[]) {
+  const start = Date.UTC(2026, 5, 1) / 1000
+
+  return totals.map((total, index) => ({
+    week: start + index * 604_800,
+    total,
+    days: [total, 0, 0, 0, 0, 0, 0],
+  }))
+}
+
+/** The repository name link in each body row, in the order the rows are rendered. */
+function renderedOrder(): string[] {
+  return screen
+    .getAllByRole('row')
+    .slice(1)
+    .map((row) => within(row).getByRole('link').textContent ?? '')
+}
 
 function renderPage() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -195,4 +223,108 @@ test('the live status region persists across the pending-to-resolved transition'
   const resolvedNode = screen.getByTestId('row-status-facebook/react')
   expect(resolvedNode).toBe(pendingNode)
   expect(resolvedNode).not.toHaveTextContent(/loading/i)
+})
+
+test('each row draws a sparkline of its recent commit activity', async () => {
+  server.use(
+    http.get(COMMIT_ACTIVITY_URL, () => HttpResponse.json(commitWeeks([3, 0, 7, 2]))),
+    http.get('https://api.github.com/repos/:owner/:name', ({ params }) =>
+      HttpResponse.json(repoPayload(`${params.owner}/${params.name}`, 10)),
+    ),
+  )
+
+  renderPage()
+
+  await waitFor(() =>
+    expect(screen.getAllByRole('img', { name: /commits in the last/i })).toHaveLength(3),
+  )
+  // The text alternative carries the number, so the chart is not visual-only.
+  const [first] = screen.getAllByRole('img', { name: /commits in the last/i })
+  expect(first).toHaveAccessibleName('12 commits in the last 4 weeks')
+})
+
+test('a row whose repository failed spends no request on its sparkline', async () => {
+  const activityRequests: string[] = []
+  server.use(
+    http.get(COMMIT_ACTIVITY_URL, ({ params }) => {
+      activityRequests.push(`${params.owner}/${params.name}`)
+      return HttpResponse.json([])
+    }),
+    http.get('https://api.github.com/repos/facebook/react', () =>
+      HttpResponse.json({ message: 'Not Found' }, { status: 404 }),
+    ),
+    http.get('https://api.github.com/repos/:owner/:name', ({ params }) =>
+      HttpResponse.json(repoPayload(`${params.owner}/${params.name}`, 5)),
+    ),
+  )
+
+  renderPage()
+
+  await screen.findByText('vercel/next.js')
+  await waitFor(() => expect(activityRequests).toHaveLength(2))
+  expect(activityRequests).not.toContain('facebook/react')
+})
+
+describe('column sorting', () => {
+  const STARS: Record<string, number> = {
+    'facebook/react': 100,
+    'vercel/next.js': 300,
+    'rails/rails': 200,
+  }
+
+  function stubRepos() {
+    server.use(
+      http.get('https://api.github.com/repos/:owner/:name', ({ params }) => {
+        const fullName = `${params.owner}/${params.name}`
+        return HttpResponse.json(repoPayload(fullName, STARS[fullName] ?? 0))
+      }),
+    )
+  }
+
+  test('rows start in name order and re-order when a column is chosen', async () => {
+    stubRepos()
+    const user = userEvent.setup()
+    renderPage()
+
+    await screen.findByText('rails/rails')
+    expect(renderedOrder()).toEqual(['facebook/react', 'rails/rails', 'vercel/next.js'])
+
+    await user.click(screen.getByRole('button', { name: /stars/i }))
+    expect(renderedOrder()).toEqual(['vercel/next.js', 'rails/rails', 'facebook/react'])
+  })
+
+  test('clicking the active column reverses it', async () => {
+    stubRepos()
+    const user = userEvent.setup()
+    renderPage()
+
+    await screen.findByText('rails/rails')
+    await user.click(screen.getByRole('button', { name: /stars/i }))
+    await user.click(screen.getByRole('button', { name: /stars/i }))
+
+    expect(renderedOrder()).toEqual(['facebook/react', 'rails/rails', 'vercel/next.js'])
+  })
+
+  test('the sorted column reports its direction through aria-sort', async () => {
+    stubRepos()
+    const user = userEvent.setup()
+    renderPage()
+
+    await screen.findByText('rails/rails')
+    expect(screen.getByRole('columnheader', { name: /repository/i })).toHaveAttribute(
+      'aria-sort',
+      'ascending',
+    )
+
+    await user.click(screen.getByRole('button', { name: /stars/i }))
+
+    expect(screen.getByRole('columnheader', { name: /stars/i })).toHaveAttribute(
+      'aria-sort',
+      'descending',
+    )
+    expect(screen.getByRole('columnheader', { name: /repository/i })).toHaveAttribute(
+      'aria-sort',
+      'none',
+    )
+  })
 })
