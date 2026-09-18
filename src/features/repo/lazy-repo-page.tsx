@@ -7,16 +7,29 @@ import { Skeleton } from '../../components/skeleton'
  * so the landing page — which has no Recharts chart on it — downloaded the whole charting
  * library before it could paint.
  *
- * The fallback is silent: `RepoPage` mounts with its own status region and announces the
- * load itself, and announcing a chunk fetch as well would be noise.
+ * `RepoPage`'s own status region only exists once its chunk has finished loading, so
+ * navigating here would otherwise announce nothing until then. The fallback carries a
+ * status region of its own — present from first render, alongside the (decorative,
+ * `aria-hidden`) `Skeleton` — to cover exactly that gap.
  */
 const RepoPage = lazy(() =>
   import('./repo-page').then((module) => ({ default: module.RepoPage })),
 )
 
+function RepoPageFallback() {
+  return (
+    <>
+      <span role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+        Loading repository
+      </span>
+      <Skeleton rows={6} />
+    </>
+  )
+}
+
 export function LazyRepoPage() {
   return (
-    <Suspense fallback={<Skeleton rows={6} />}>
+    <Suspense fallback={<RepoPageFallback />}>
       <RepoPage />
     </Suspense>
   )
