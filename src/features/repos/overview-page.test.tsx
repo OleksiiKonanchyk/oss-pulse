@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { http, HttpResponse, delay } from 'msw'
@@ -70,7 +70,10 @@ test('a failing repository row does not blank the page', async () => {
   renderPage()
 
   expect(await screen.findByText('vercel/next.js')).toBeInTheDocument()
-  expect(await screen.findByText(/unavailable/i)).toBeInTheDocument()
+  // The failed row now has two nodes carrying "unavailable" — the visible cell text and the
+  // sr-only status-region echo used for announcement (see the two tests below) — so match
+  // on "some element", not "exactly one".
+  expect((await screen.findAllByText(/unavailable/i)).length).toBeGreaterThan(0)
 })
 
 test('a pending row exposes a busy state to assistive technology', () => {
@@ -99,6 +102,34 @@ test('a failed row announces unavailability rather than silently swapping text',
 
   renderPage()
 
-  const status = await screen.findByRole('status')
-  expect(status).toHaveTextContent(/unavailable/i)
+  // Every row carries a persistent role="status" live region (see the next test for why),
+  // so target the failing row's specifically rather than assuming there is only one.
+  const status = screen.getByTestId('row-status-facebook/react')
+  expect(status).toHaveAttribute('role', 'status')
+  await waitFor(() => expect(status).toHaveTextContent(/unavailable/i))
+})
+
+test('the live status region persists across the pending-to-resolved transition', async () => {
+  // A live region that already exists when its text changes is reliably announced by
+  // assistive technology; one that is unmounted and recreated at the moment of the change
+  // often is not, because the AT never observes a transition. @testing-library/react can't
+  // observe *announcement* timing, but it can prove the structural property that makes
+  // announcement possible: the DOM node itself must be the same node before and after.
+  server.use(
+    http.get('https://api.github.com/repos/:owner/:name', async ({ params }) => {
+      await delay(20)
+      return HttpResponse.json(repoPayload(`${params.owner}/${params.name}`, 5))
+    }),
+  )
+
+  renderPage()
+
+  const pendingNode = screen.getByTestId('row-status-facebook/react')
+  expect(pendingNode).toHaveTextContent(/loading/i)
+
+  await screen.findByText('facebook/react')
+
+  const resolvedNode = screen.getByTestId('row-status-facebook/react')
+  expect(resolvedNode).toBe(pendingNode)
+  expect(resolvedNode).not.toHaveTextContent(/loading/i)
 })
