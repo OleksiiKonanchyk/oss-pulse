@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import App from './App'
 
-test('renders the application name', () => {
+test('renders the application shell', async () => {
   render(<App />)
-  expect(screen.getByRole('heading', { name: /oss pulse/i })).toBeInTheDocument()
+  expect(await screen.findByRole('link', { name: 'OSS Pulse' })).toBeInTheDocument()
 })
