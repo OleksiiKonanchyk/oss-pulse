@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Agent implementation plan — kept locally, not published
+docs/superpowers/plans/
