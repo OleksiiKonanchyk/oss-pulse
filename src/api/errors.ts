@@ -1,0 +1,57 @@
+export type ApiError =
+  | { kind: 'rate-limited'; resetAt: Date }
+  | { kind: 'not-found' }
+  | { kind: 'network' }
+  | { kind: 'unknown'; status: number; message: string }
+
+/** Carries a classified ApiError across the throw boundary into TanStack Query. */
+export class GitHubError extends Error {
+  readonly error: ApiError
+
+  constructor(error: ApiError) {
+    super(error.kind)
+    this.name = 'GitHubError'
+    this.error = error
+  }
+}
+
+export function isApiError(value: unknown): value is GitHubError {
+  return value instanceof GitHubError
+}
+
+const ONE_HOUR_MS = 3_600_000
+
+function messageFrom(body: unknown, fallback: string): string {
+  if (body && typeof body === 'object' && 'message' in body) {
+    const { message } = body as { message: unknown }
+    if (typeof message === 'string' && message.length > 0) return message
+  }
+  return fallback
+}
+
+/**
+ * A 403 from GitHub means two very different things depending on the rate-limit
+ * headers: quota exhausted (recoverable, with a known reset time) or genuinely
+ * forbidden. Only the first earns the countdown screen.
+ */
+export function classifyResponse(response: Response, body: unknown): ApiError {
+  const remaining = response.headers.get('x-ratelimit-remaining')
+  const exhausted = remaining === '0'
+
+  if ((response.status === 403 || response.status === 429) && exhausted) {
+    const reset = response.headers.get('x-ratelimit-reset')
+    const resetAt = reset
+      ? new Date(Number(reset) * 1000)
+      : new Date(Date.now() + ONE_HOUR_MS)
+
+    return { kind: 'rate-limited', resetAt }
+  }
+
+  if (response.status === 404) return { kind: 'not-found' }
+
+  return {
+    kind: 'unknown',
+    status: response.status,
+    message: messageFrom(body, response.statusText || `HTTP ${response.status}`),
+  }
+}
