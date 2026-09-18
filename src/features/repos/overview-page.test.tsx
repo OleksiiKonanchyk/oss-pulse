@@ -70,10 +70,12 @@ test('a failing repository row does not blank the page', async () => {
   renderPage()
 
   expect(await screen.findByText('vercel/next.js')).toBeInTheDocument()
-  // The failed row now has two nodes carrying "unavailable" — the visible cell text and the
-  // sr-only status-region echo used for announcement (see the two tests below) — so match
-  // on "some element", not "exactly one".
-  expect((await screen.findAllByText(/unavailable/i)).length).toBeGreaterThan(0)
+  // The failed row also has a screen-reader-only status-region echo of "unavailable" (see
+  // the tests below), so exclude it explicitly — this must prove the *visible* cell text
+  // renders, not just that some element somewhere contains the word.
+  expect(
+    await screen.findByText(/unavailable/i, { ignore: 'script, style, .sr-only' }),
+  ).toBeInTheDocument()
 })
 
 test('a pending row exposes a busy state to assistive technology', () => {
