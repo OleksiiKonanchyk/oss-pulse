@@ -1,3 +1,4 @@
+import type { IssueFilters } from '../../api/types'
 import { Card } from '../../components/card'
 import { EmptyState } from '../../components/empty-state'
 import { ErrorState } from '../../components/error-state'
@@ -8,9 +9,34 @@ import { IssuesFilters } from './issues-filters'
 import { IssuesTable } from './issues-table'
 import { useIssuesParams } from './use-issues-params'
 
+/**
+ * `useIssues` sets `placeholderData: (previous) => previous`, so a filter or page change
+ * swaps the visible rows silently — the results container is never unmounted, so an
+ * assistive-technology user gets no signal anything happened. This produces the text for
+ * a persistent status region that names both the count and the active state/page, so a
+ * filter change ("3 closed issues") reads differently from a page change ("page 2").
+ */
+function describeResult(
+  status: 'pending' | 'error' | 'ready',
+  filters: IssueFilters,
+  count: number | undefined,
+): string {
+  if (status === 'pending') return 'Loading issues'
+  if (status === 'error') return 'Issues failed to load'
+  if (count === undefined) return ''
+
+  const stateLabel = filters.state === 'all' ? 'all' : filters.state
+  return count === 0
+    ? `No ${stateLabel} issues match these filters, page ${filters.page}`
+    : `${count} ${stateLabel} issue${count === 1 ? '' : 's'}, page ${filters.page}`
+}
+
 export function IssuesPanel({ fullName }: { fullName: string }) {
   const { filters, setFilters } = useIssuesParams()
   const { data, isPending, isError, error, refetch, isFetching } = useIssues(fullName, filters)
+
+  const status = isPending ? 'pending' : isError ? 'error' : 'ready'
+  const statusText = describeResult(status, filters, data?.issues.length)
 
   return (
     <div className="space-y-6">
@@ -22,6 +48,16 @@ export function IssuesPanel({ fullName }: { fullName: string }) {
         <IssuesFilters filters={filters} onChange={setFilters} />
 
         <div className="mt-4" aria-busy={isFetching}>
+          <span
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            data-testid="issues-status"
+            className="sr-only"
+          >
+            {statusText}
+          </span>
+
           {isPending ? (
             <Skeleton rows={6} />
           ) : isError ? (

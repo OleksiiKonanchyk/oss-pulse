@@ -11,6 +11,7 @@ function Probe() {
       <output>{JSON.stringify(filters)}</output>
       <button onClick={() => setFilters({ state: 'closed' })}>close</button>
       <button onClick={() => setFilters({ page: 3 })}>page 3</button>
+      <button onClick={() => setFilters({ page: 2, state: 'closed' })}>page and state</button>
     </div>
   )
 }
@@ -63,5 +64,19 @@ test('changing the page does not reset the page', async () => {
   await user.click(screen.getByRole('button', { name: 'page 3' }))
 
   expect(screen.getByRole('status')).toHaveTextContent('"page":3')
+  expect(screen.getByRole('status')).toHaveTextContent('"state":"closed"')
+})
+
+// Pins the current behaviour when page and a filter are set in the same call: this is
+// not "paging only" (more than one key changed), so it takes the reset-to-page-one branch
+// and the caller's requested page is dropped. No call site in the app does this today, but
+// nothing else pins it, so a future refactor of setFilters could change it unnoticed.
+test('setting the page together with another filter resets to page one anyway', async () => {
+  const user = userEvent.setup()
+  renderAt('/r?page=5')
+
+  await user.click(screen.getByRole('button', { name: 'page and state' }))
+
+  expect(screen.getByRole('status')).toHaveTextContent('"page":1')
   expect(screen.getByRole('status')).toHaveTextContent('"state":"closed"')
 })
