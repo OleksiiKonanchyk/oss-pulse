@@ -43,3 +43,15 @@ test('renders unexpected errors without leaking a raw stack', () => {
   expect(screen.getByRole('heading', { name: /something went wrong/i })).toBeInTheDocument()
   expect(screen.queryByText(/kaboom/)).not.toBeInTheDocument()
 })
+
+test('shows status code for unknown GitHub errors without leaking raw messages', () => {
+  render(
+    <MemoryRouter>
+      <ErrorState error={new GitHubError({ kind: 'unknown', status: 502, message: 'Bad gateway' })} />
+    </MemoryRouter>
+  )
+
+  expect(screen.getByRole('heading', { name: /something went wrong/i })).toBeInTheDocument()
+  expect(screen.getByText(/502/)).toBeInTheDocument()
+  expect(screen.queryByText(/bad gateway/i)).not.toBeInTheDocument()
+})
