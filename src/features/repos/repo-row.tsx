@@ -9,7 +9,10 @@ export function RepoRow({ fullName, onUntrack }: { fullName: string; onUntrack: 
     return (
       <tr>
         <td colSpan={5} className="px-4 py-3">
-          <div className="h-5 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
+          <div aria-busy="true" aria-live="polite">
+            <span className="sr-only">Loading {fullName}</span>
+            <div className="h-5 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
+          </div>
         </td>
       </tr>
     )
@@ -19,8 +22,8 @@ export function RepoRow({ fullName, onUntrack }: { fullName: string; onUntrack: 
     return (
       <tr>
         <td className="px-4 py-3 font-medium">{fullName}</td>
-        <td colSpan={4} className="px-4 py-3 text-sm text-slate-500">
-          unavailable
+        <td colSpan={4} className="px-4 py-3 text-sm text-slate-500" role="status">
+          <span className="sr-only">{fullName} is </span>unavailable
         </td>
       </tr>
     )
@@ -43,9 +46,10 @@ export function RepoRow({ fullName, onUntrack }: { fullName: string; onUntrack: 
         <button
           type="button"
           onClick={onUntrack}
+          aria-label={`Remove ${data.fullName}`}
           className="text-sm text-slate-500 underline-offset-4 hover:underline"
         >
-          Remove<span className="sr-only"> {data.fullName} row</span>
+          Remove
         </button>
       </td>
     </tr>

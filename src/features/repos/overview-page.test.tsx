@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
-import { http, HttpResponse } from 'msw'
+import { http, HttpResponse, delay } from 'msw'
 import { server } from '../../../test/msw/server'
 import { OverviewPage } from './overview-page'
 
@@ -71,4 +71,34 @@ test('a failing repository row does not blank the page', async () => {
 
   expect(await screen.findByText('vercel/next.js')).toBeInTheDocument()
   expect(await screen.findByText(/unavailable/i)).toBeInTheDocument()
+})
+
+test('a pending row exposes a busy state to assistive technology', () => {
+  server.use(
+    http.get('https://api.github.com/repos/:owner/:name', async ({ params }) => {
+      await delay('infinite')
+      return HttpResponse.json(repoPayload(`${params.owner}/${params.name}`, 5))
+    }),
+  )
+
+  renderPage()
+
+  expect(screen.getByText('Loading facebook/react')).toBeInTheDocument()
+  expect(screen.getByText('Loading vercel/next.js')).toBeInTheDocument()
+})
+
+test('a failed row announces unavailability rather than silently swapping text', async () => {
+  server.use(
+    http.get('https://api.github.com/repos/facebook/react', () =>
+      HttpResponse.json({ message: 'Not Found' }, { status: 404 }),
+    ),
+    http.get('https://api.github.com/repos/:owner/:name', ({ params }) =>
+      HttpResponse.json(repoPayload(`${params.owner}/${params.name}`, 5)),
+    ),
+  )
+
+  renderPage()
+
+  const status = await screen.findByRole('status')
+  expect(status).toHaveTextContent(/unavailable/i)
 })

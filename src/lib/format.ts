@@ -1,6 +1,8 @@
 export function formatCompact(value: number): string {
   if (value < 1000) return String(value)
-  if (value < 1_000_000) return `${(value / 1000).toFixed(1).replace(/\.0$/, '')}k`
+  // Compare the rounded magnitude, not the raw value: 999999 / 1000 = 999.999, which
+  // toFixed(1) rounds up to "1000.0" — that must become "1M", not "1000k".
+  if (value / 1000 < 999.95) return `${(value / 1000).toFixed(1).replace(/\.0$/, '')}k`
 
   return `${(value / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`
 }
