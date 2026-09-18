@@ -328,3 +328,31 @@ describe('column sorting', () => {
     )
   })
 })
+
+/**
+ * Removing a repository is local state and needs no response, but the button used to be
+ * gated on the row having loaded — so a row that 404'd or arrived rate-limited, which is
+ * the row a user most wants gone, could not be removed at all.
+ */
+test('a row that failed to load can still be untracked', async () => {
+  server.use(
+    http.get('https://api.github.com/repos/facebook/react', () =>
+      HttpResponse.json({ message: 'Not Found' }, { status: 404 }),
+    ),
+    http.get('https://api.github.com/repos/:owner/:name', ({ params }) =>
+      HttpResponse.json(repoPayload(`${params.owner}/${params.name}`, 5)),
+    ),
+  )
+
+  const user = userEvent.setup()
+  renderPage()
+
+  await waitFor(() =>
+    expect(screen.getByTestId('row-status-facebook/react')).toHaveTextContent(/unavailable/i),
+  )
+
+  await user.click(screen.getByRole('button', { name: 'Remove facebook/react' }))
+
+  expect(screen.queryByTestId('row-status-facebook/react')).not.toBeInTheDocument()
+  expect(screen.getByText('vercel/next.js')).toBeInTheDocument()
+})

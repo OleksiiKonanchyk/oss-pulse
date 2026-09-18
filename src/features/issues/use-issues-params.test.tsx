@@ -1,5 +1,6 @@
-import { render, screen } from '@testing-library/react'
+import { render, renderHook, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import type { ReactNode } from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { useIssuesParams } from './use-issues-params'
 
@@ -79,4 +80,23 @@ test('setting the page together with another filter resets to page one anyway', 
 
   expect(screen.getByRole('status')).toHaveTextContent('"page":1')
   expect(screen.getByRole('status')).toHaveTextContent('"state":"closed"')
+})
+
+/**
+ * `setFilters` is memoised, and the memo has to be real: it used to depend on the
+ * `filters` object, which is rebuilt on every render, so the callback was rebuilt on every
+ * render too — a memo that cost a dependency array and bought nothing, and that would hand
+ * a stale merge to anything holding the callback across a render.
+ */
+test('setFilters survives a re-render that did not change the URL', () => {
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <MemoryRouter initialEntries={['/r?state=closed']}>{children}</MemoryRouter>
+  )
+
+  const { result, rerender } = renderHook(() => useIssuesParams(), { wrapper })
+  const first = result.current.setFilters
+
+  rerender()
+
+  expect(result.current.setFilters).toBe(first)
 })

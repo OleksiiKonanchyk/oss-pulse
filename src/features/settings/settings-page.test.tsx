@@ -44,3 +44,17 @@ test('states where the token is stored and where it is sent', () => {
   expect(screen.getByText(/stays in your browser/i)).toBeInTheDocument()
   expect(screen.getByText(/api\.github\.com/i)).toBeInTheDocument()
 })
+
+test('clearing cached data says so, from a region that was there beforehand', async () => {
+  const user = userEvent.setup()
+  renderPage()
+
+  const status = screen.getByTestId('cache-status')
+  expect(status).toHaveAttribute('role', 'status')
+  expect(status).toHaveTextContent('')
+
+  await user.click(screen.getByRole('button', { name: /clear cached data/i }))
+
+  expect(screen.getByTestId('cache-status')).toBe(status)
+  expect(status).toHaveTextContent(/cached data cleared/i)
+})

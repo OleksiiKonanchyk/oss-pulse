@@ -14,6 +14,7 @@ function clearCachedData(): void {
 export function SettingsPage() {
   const savedToken = useToken()
   const [draftToken, setDraftToken] = useState(() => getToken() ?? '')
+  const [cacheMessage, setCacheMessage] = useState('')
   const tokenFieldId = useId()
 
   function handleSave() {
@@ -23,6 +24,11 @@ export function SettingsPage() {
   function handleClear() {
     setToken(null)
     setDraftToken('')
+  }
+
+  function handleClearCache() {
+    clearCachedData()
+    setCacheMessage('Cached data cleared. The next request will be a fresh one.')
   }
 
   return (
@@ -95,12 +101,29 @@ export function SettingsPage() {
           <div>
             <button
               type="button"
-              onClick={clearCachedData}
+              onClick={handleClearCache}
               className="rounded border border-slate-300 px-4 py-1.5 font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 dark:border-slate-700"
             >
               Clear cached data
             </button>
           </div>
+
+          {/*
+            Clearing the cache is invisible by nature — nothing on this page changes — so
+            it said nothing at all while the token controls next to it visibly react. The
+            region is rendered empty from the start, per the pattern used across the app,
+            so that its text is announced when it appears rather than the region itself
+            appearing with text already in it.
+          */}
+          <p
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            data-testid="cache-status"
+            className="text-sm text-slate-600 dark:text-slate-400"
+          >
+            {cacheMessage}
+          </p>
         </div>
       </Card>
     </div>

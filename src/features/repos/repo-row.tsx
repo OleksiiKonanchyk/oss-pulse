@@ -81,16 +81,20 @@ export function RepoRow({ fullName, onUntrack }: { fullName: string; onUntrack: 
         )}
       </td>
       <td className="px-4 py-3 text-right">
-        {repo && (
-          <button
-            type="button"
-            onClick={onUntrack}
-            aria-label={`Remove ${repo.fullName}`}
-            className="text-sm text-slate-500 underline-offset-4 hover:underline"
-          >
-            Remove
-          </button>
-        )}
+        {/*
+          Not gated on the repository having loaded. Untracking is local state — it does
+          not need the response — and gating it meant a row that 404'd or arrived
+          rate-limited could never be removed, which is exactly the row a user most wants
+          gone.
+        */}
+        <button
+          type="button"
+          onClick={onUntrack}
+          aria-label={`Remove ${fullName}`}
+          className="text-sm text-slate-500 underline-offset-4 hover:underline"
+        >
+          Remove
+        </button>
       </td>
     </tr>
   )

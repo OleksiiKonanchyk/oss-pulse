@@ -9,7 +9,11 @@ export class GitHubError extends Error {
   readonly error: ApiError
 
   constructor(error: ApiError) {
-    super(error.kind)
+    // Nothing renders `message` — components switch on `kind`, and leaking GitHub's prose
+    // into the UI is what the designed screens exist to avoid. It goes here instead, where
+    // it costs nothing and makes an unknown failure legible in devtools and in a test's
+    // output rather than showing up as the bare word "unknown".
+    super(error.kind === 'unknown' ? `${error.kind}: ${error.status} ${error.message}` : error.kind)
     this.name = 'GitHubError'
     this.error = error
   }

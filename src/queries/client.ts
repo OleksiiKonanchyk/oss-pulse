@@ -1,5 +1,6 @@
 import { QueryClient } from '@tanstack/react-query'
 import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister'
+import type { PersistedClient } from '@tanstack/react-query-persist-client'
 
 const ONE_HOUR = 3_600_000
 
@@ -22,13 +23,6 @@ export const queryClient = new QueryClient({
   },
 })
 
-// Derived from the function we already import, rather than reaching for
-// `@tanstack/query-persist-client-core` (a transitive dependency this package
-// never declares directly) just to name the same type.
-type PersisterOptions = Parameters<typeof createSyncStoragePersister>[0]
-type Deserialize = NonNullable<PersisterOptions['deserialize']>
-type PersistedCache = Deserialize extends (cachedString: string) => infer TResult ? TResult : never
-
 /**
  * `createSyncStoragePersister` round-trips the whole query cache through
  * `JSON.stringify`/`JSON.parse` by default. `JSON.stringify` calls
@@ -50,19 +44,15 @@ function reviveDates(_key: string, value: unknown): unknown {
   return typeof value === 'string' && ISO_DATE_PATTERN.test(value) ? new Date(value) : value
 }
 
-export function serializeCache(persistedClient: PersistedCache): string {
-  return JSON.stringify(persistedClient)
-}
-
-export function deserializeCache(cachedString: string): PersistedCache {
-  return JSON.parse(cachedString, reviveDates) as unknown as PersistedCache
+export function deserializeCache(cachedString: string): PersistedClient {
+  return JSON.parse(cachedString, reviveDates) as PersistedClient
 }
 
 export function createPersister() {
   return createSyncStoragePersister({
     storage: window.localStorage,
     key: 'oss-pulse:query-cache',
-    serialize: serializeCache,
+    serialize: JSON.stringify,
     deserialize: deserializeCache,
   })
 }

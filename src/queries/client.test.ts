@@ -1,5 +1,5 @@
 import { QueryClient, dehydrate } from '@tanstack/react-query'
-import { deserializeCache, queryClient, serializeCache } from './client'
+import { deserializeCache, queryClient } from './client'
 import { queryKeys } from './keys'
 import type { Repo } from '../api/types'
 
@@ -26,7 +26,7 @@ test('issue query keys vary with their filters', () => {
  * turns `Date` fields into ISO strings on the way out and never turns them
  * back on the way in. These tests drive `serializeCache`/`deserializeCache` —
  * the exact functions wired into `createPersister`'s `serialize`/`deserialize`
- * options — through a real dehydrated query cache, rather than asserting on
+ * options (`serialize` is `JSON.stringify` itself) — through a real dehydrated query cache, rather than asserting on
  * some hand-rolled stand-in for what the persister does.
  */
 describe('cache serialization date revival', () => {
@@ -45,7 +45,7 @@ describe('cache serialization date revival', () => {
     const client = new QueryClient()
     client.setQueryData(['repo', repo.fullName], repo)
 
-    const persisted = serializeCache({
+    const persisted = JSON.stringify({
       timestamp: Date.now(),
       buster: '',
       clientState: dehydrate(client),
